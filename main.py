@@ -2,6 +2,7 @@ import random
 from tkinter import *
 from tkinter import messagebox
 import pyperclip  # allow to put string into the clipboard
+import json
 
 # ---------------------------- PASSWORD GENERATOR ------------------------------- #
 
@@ -79,7 +80,7 @@ def generate_password():
     pyperclip.copy(password)  # copy password into clipboard, so that we can use cmd+v to paste it to the website
 
 
-# ---------------------------- SAVE PASSWORD ------------------------------- #
+# ---------------------------- SAVE AND FIND PASSWORD ------------------------------- #
 
 
 def save():
@@ -88,15 +89,49 @@ def save():
     password = password_box.get()
 
     if len(website.strip()) == 0 or len(username.strip()) == 0 or len(password.strip()) == 0:  # if a field is empty or contains all space
-        messagebox.showwarning(title="Error", message="Do not leave any field empty!")
+        messagebox.showwarning(title="Oops", message="Do not leave any field empty!")
         return
+
+    new_info = {website: {"username": username, "password": password}}  # json format
 
     is_confirmed = messagebox.askokcancel(title=website, message=f"Confirm: \nUsername: {username}\nPassword: {password}")
     if is_confirmed:
-        with open("login_info.txt", "a") as login_file:
-            login_file.write(f"{website} -- {username} -- {password}\n")
+        try:
+            with open("login_info.json", "r") as login_file:
+                info = json.load(login_file)  # read old data
+        except FileNotFoundError:
+            with open("login_info.json", "w") as login_file:
+                json.dump(new_info, login_file, indent=4)  # save new data
+        else:
+            info.update(new_info)  # update old data to new data
+            with open("login_info.json", "w") as login_file:
+                json.dump(info, login_file, indent=4)  # save new data
+        finally:
             website_box.delete(0, END)
             password_box.delete(0, END)
+
+
+def search():
+    website = website_box.get()
+    if len(website.strip()) == 0:
+        messagebox.showwarning(title="Oops", message="Please enter the website name.")
+        return
+
+    try:
+        with open("login_info.json", "r") as login_file:
+            info = json.load(login_file)  # read data
+            found_info = info[website]
+    except FileNotFoundError:
+        messagebox.showwarning(title="Oops", message=f"Cannot find any account associated with {website}.")
+    except KeyError:
+        messagebox.showwarning(title="Oops", message=f"Cannot find any account associated with {website}.")
+    else:
+        found_username = found_info["username"]
+        found_password = found_info["password"]
+        messagebox.showinfo(title=f"{website}", message=f"Username: {found_username}\nPassword: {found_password}")
+    finally:
+        website_box.delete(0, END)
+        password_box.delete(0, END)
 
 
 # ---------------------------- UI SETUP ------------------------------- #
@@ -117,9 +152,12 @@ canvas.grid(column=2, row=1)
 website_label = Label(text="Website:", font=("Ariel", 15, "bold"))
 website_label.grid(column=1, row=2)
 
-website_box = Entry(width=36)
-website_box.grid(column=2, row=2, columnspan=2)
+website_box = Entry(width=21)
+website_box.grid(column=2, row=2)
 website_box.focus()  # automatically focus on this text box when window is opened
+
+search_button = Button(text="Search", width=11, command=search)
+search_button.grid(column=3, row=2)
 
 # username line
 username_label = Label(text="Email/Username:", font=("Ariel", 15, "bold"))
